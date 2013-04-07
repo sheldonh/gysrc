@@ -43,9 +43,7 @@ setup() {
 		( cd "redis-${version}" && make )
 	fi
 
-	for port in 6379 6380 6381; do
-		if [ ! -e redis${port}.conf ]; then
-			template=$(cat <<EOF
+	template=$(cat <<EOF
 daemonize yes
 pidfile ./redisSED_PORT_SED.pid
 port SED_PORT_SED
@@ -68,8 +66,9 @@ rdbchecksum yes
 dbfilename dumpSED_PORT_SED.rdb
 dir ./
 
+slaveof SED_SLAVEOF_SED
 slave-serve-stale-data yes
-slave-read-only yes
+slave-read-only no
 repl-disable-tcp-nodelay no
 slave-priority 100
 
@@ -98,9 +97,10 @@ client-output-buffer-limit pubsub 32mb 8mb 60
 hz 10
 EOF
 	)
-			echo "$template" | sed -e "s/SED_PORT_SED/${port}/g" > redis${port}.conf
-		fi
-	done
+
+	echo "$template" | sed -e "s/SED_PORT_SED/6380/g" -e "s/SED_SLAVEOF_SED/no one/g" > redis6380.conf
+	echo "$template" | sed -e "s/SED_PORT_SED/6381/g" -e "s/SED_SLAVEOF_SED/127.0.0.1 6380/g" > redis6381.conf
+	echo "$template" | sed -e "s/SED_PORT_SED/6382/g" -e "s/SED_SLAVEOF_SED/127.0.0.1 6380/g" > redis6382.conf
 }
 
 case "$1" in
@@ -112,10 +112,10 @@ case "$1" in
 		setup
 		shift
 		ports="$*"
-		ports=${ports:=6379 6380 6381}
+		ports=${ports:=6380 6381 6382}
 		for port in $ports; do
-			if [ $port != 6379 -a $port != 6380 -a $port != 6381 ]; then
-				echo "error: only ports 6379, 6380 and 6381 are supported"
+			if [ $port != 6380 -a $port != 6381 -a $port != 6382 ]; then
+				echo "error: only ports 6380, 6381 and 6382 are supported"
 				exit 1
 			fi
 			if ! alive $port; then
@@ -130,10 +130,10 @@ case "$1" in
 		setup
 		shift
 		ports="$*"
-		ports=${ports:=6379 6380 6381}
+		ports=${ports:=6380 6381 6382}
 		for port in $ports; do
-			if [ $port != 6379 -a $port != 6380 -a $port != 6381 ]; then
-				echo "$PROGNAME: error: only ports 6379, 6380 and 6381 are supported"
+			if [ $port != 6380 -a $port != 6381 -a $port != 6382 ]; then
+				echo "$PROGNAME: error: only ports 6380, 6381 and 6382 are supported"
 				exit 1
 			fi
 			if alive $port; then
@@ -148,7 +148,7 @@ case "$1" in
 		setup
 		shift
 		ports="$*"
-		ports=${ports:=6379 6380 6381}
+		ports=${ports:=6380 6381 6382}
 		status=0
 		for port in $ports; do
 			if alive $port; then
@@ -169,7 +169,7 @@ configured. Then an action (start, stop, status) is performed if specified.
 If no action is specified, just the download, build and configure are
 performed.
 
-If no port numbers are specified for an action, then 6379, 6380 and 6381 are
+If no port numbers are specified for an action, then 6380, 6381 and 6382 are
 assumed. Otherwise the actions are limited to the ports specified.
 EOF
 		;;
