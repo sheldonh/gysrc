@@ -98,9 +98,9 @@ hz 10
 EOF
 	)
 
-	echo "$template" | sed -e "s/SED_PORT_SED/6380/g" -e "s/SED_SLAVEOF_SED/no one/g" > redis6380.conf
-	echo "$template" | sed -e "s/SED_PORT_SED/6381/g" -e "s/SED_SLAVEOF_SED/127.0.0.1 6380/g" > redis6381.conf
-	echo "$template" | sed -e "s/SED_PORT_SED/6382/g" -e "s/SED_SLAVEOF_SED/127.0.0.1 6380/g" > redis6382.conf
+	[ -e redis6380.conf ] || echo "$template" | sed -e "s/SED_PORT_SED/6380/g" -e "s/SED_SLAVEOF_SED/no one/g" > redis6380.conf
+	[ -e redis6381.conf ] || echo "$template" | sed -e "s/SED_PORT_SED/6381/g" -e "s/SED_SLAVEOF_SED/127.0.0.1 6380/g" > redis6381.conf
+	[ -e redis6382.conf ] || echo "$template" | sed -e "s/SED_PORT_SED/6382/g" -e "s/SED_SLAVEOF_SED/127.0.0.1 6380/g" > redis6382.conf
 }
 
 case "$1" in
