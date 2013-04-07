@@ -1,0 +1,176 @@
+#!/bin/sh -e
+
+PROGNAME="$(basename $0)"
+
+version=${REDIS_VERSION:=2.6.12}
+
+base="$(dirname $0)"
+
+runningpids() {
+	pidof "redis-${version}/src/redis-server" || true
+}
+
+getpid() {
+	local port=$1
+	pid=$(cat redis${port}.pid 2>/dev/null || true)
+	[ -n "$pid" ] && echo $pid
+	return 0
+}
+
+alive() {
+	local port=$1
+	pid=$(getpid $port)
+	for running in $(runningpids); do
+		if [ $running = "$pid" ]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
+setup() {
+	cd "$base"
+	if [ ! -e "dist/redis-${version}.tar.gz" ]; then
+		mkdir -p dist
+		wget -O "dist/redis-${version}.tar.gz" "http://redis.googlecode.com/files/redis-${version}.tar.gz"
+	fi
+
+	if [ ! -d "redis-${version}" ]; then
+		tar -xzf "dist/redis-${version}.tar.gz"
+	fi
+
+	if [ ! -x "redis-${version}/src/redis-server" ]; then
+		( cd "redis-${version}" && make )
+	fi
+
+	for port in 6379 6380 6381; do
+		if [ ! -e redis${port}.conf ]; then
+			template=$(cat <<EOF
+daemonize yes
+pidfile ./redisSED_PORT_SED.pid
+port SED_PORT_SED
+timeout 0
+tcp-keepalive 0
+
+loglevel notice
+logfile stdout
+syslog-enabled yes
+syslog-ident redis
+
+databases 16
+
+save 900 1
+save 300 10
+save 60 10000
+stop-writes-on-bgsave-error yes
+rdbcompression yes
+rdbchecksum yes
+dbfilename dumpSED_PORT_SED.rdb
+dir ./
+
+slave-serve-stale-data yes
+slave-read-only yes
+repl-disable-tcp-nodelay no
+slave-priority 100
+
+appendonly yes
+appendfilename appendonlySED_PORT_SED.aof
+appendfsync everysec
+no-appendfsync-on-rewrite no
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+
+lua-time-limit 5000
+slowlog-log-slower-than 10000
+slowlog-max-len 128
+
+hash-max-ziplist-entries 512
+hash-max-ziplist-value 64
+list-max-ziplist-entries 512
+list-max-ziplist-value 64
+set-max-intset-entries 512
+zset-max-ziplist-entries 128
+zset-max-ziplist-value 64
+activerehashing yes
+client-output-buffer-limit normal 0 0 0
+client-output-buffer-limit slave 256mb 64mb 60
+client-output-buffer-limit pubsub 32mb 8mb 60
+hz 10
+EOF
+	)
+			echo "$template" | sed -e "s/SED_PORT_SED/${port}/g" > redis${port}.conf
+		fi
+	done
+}
+
+case "$1" in
+	'')
+		setup
+		echo "Redis downloaded, built and configured"
+		;;
+	start)
+		setup
+		shift
+		ports="$*"
+		ports=${ports:=6379 6380 6381}
+		for port in $ports; do
+			if [ $port != 6379 -a $port != 6380 -a $port != 6381 ]; then
+				echo "error: only ports 6379, 6380 and 6381 are supported"
+				exit 1
+			fi
+			if ! alive $port; then
+				echo "Starting redis-server on port $port"
+				"redis-${version}/src/redis-server" redis${port}.conf
+			else
+				echo "Already running redis-server on port $port"
+			fi
+		done
+		;;
+	stop)
+		setup
+		shift
+		ports="$*"
+		ports=${ports:=6379 6380 6381}
+		for port in $ports; do
+			if [ $port != 6379 -a $port != 6380 -a $port != 6381 ]; then
+				echo "$PROGNAME: error: only ports 6379, 6380 and 6381 are supported"
+				exit 1
+			fi
+			if alive $port; then
+				echo "Stopping redis-server on port $port"
+				kill $(getpid $port)
+			else
+				echo "Already stopped redis-server on port $port"
+			fi
+		done
+		;;
+	status)
+		setup
+		shift
+		ports="$*"
+		ports=${ports:=6379 6380 6381}
+		status=0
+		for port in $ports; do
+			if alive $port; then
+				echo "redis-server up on port $port"
+			else
+				echo "redis-server down on port $port"
+				status=1
+			fi
+		done
+		exist $status
+		;;
+	*)
+		echo 'usage: $PROGNAME [{start|stop|status} [port ...]]' 1>&2
+		echo
+		cat <<EOF
+The script always makes sure that redis has been downloaded, built and
+configured. Then an action (start, stop, status) is performed if specified.
+If no action is specified, just the download, build and configure are
+performed.
+
+If no port numbers are specified for an action, then 6379, 6380 and 6381 are
+assumed. Otherwise the actions are limited to the ports specified.
+EOF
+		;;
+esac
