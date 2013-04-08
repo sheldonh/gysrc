@@ -17,6 +17,18 @@ getpid() {
 	return 0
 }
 
+getrole() {
+	local port=$1
+	role=$("redis-${version}/src/redis-cli" -p $port info  | awk -F: '$1 == "role" {printf "%s", $2}')
+	# Work around carriage return in redis-cli output
+	if echo $role | grep -q master; then
+		echo master
+	else
+		echo slave
+	fi
+
+}
+
 alive() {
 	local port=$1
 	pid=$(getpid $port)
@@ -152,7 +164,7 @@ case "$1" in
 		status=0
 		for port in $ports; do
 			if alive $port; then
-				echo "redis-server up on port $port"
+				echo "redis-server up on port $port ($(getrole $port))"
 			else
 				echo "redis-server down on port $port"
 				status=1
