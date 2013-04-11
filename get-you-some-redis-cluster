@@ -1,10 +1,10 @@
 #!/bin/sh -e
 
-PROGNAME="$(basename $0)"
+PROGNAME=$(basename $0)
 
 version=${REDIS_VERSION:=2.6.12}
 
-base="$(dirname $0)"
+cd $(dirname $0)
 
 runningpids() {
 	pidof "redis-${version}/src/redis-server" || true
@@ -41,7 +41,6 @@ alive() {
 }
 
 setup() {
-	cd "$base"
 	if [ ! -e "dist/redis-${version}.tar.gz" ]; then
 		mkdir -p dist
 		wget -O "dist/redis-${version}.tar.gz" "http://redis.googlecode.com/files/redis-${version}.tar.gz"
