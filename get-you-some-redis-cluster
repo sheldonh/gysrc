@@ -78,7 +78,6 @@ rdbchecksum yes
 dbfilename dumpSED_PORT_SED.rdb
 dir ./
 
-slaveof SED_SLAVEOF_SED
 slave-serve-stale-data yes
 slave-read-only no
 repl-disable-tcp-nodelay no
@@ -110,15 +109,37 @@ hz 10
 EOF
 	)
 
-	[ -e redis6380.conf ] || echo "$template" | sed -e "s/SED_PORT_SED/6380/g" -e "/SED_SLAVEOF_SED/d" > redis6380.conf
-	[ -e redis6381.conf ] || echo "$template" | sed -e "s/SED_PORT_SED/6381/g" -e "s/SED_SLAVEOF_SED/127.0.0.1 6380/g" > redis6381.conf
-	[ -e redis6382.conf ] || echo "$template" | sed -e "s/SED_PORT_SED/6382/g" -e "s/SED_SLAVEOF_SED/127.0.0.1 6380/g" > redis6382.conf
+	for port in 6380 6381 6382; do
+		[ -e redis${port}.conf ] || echo "$template" | sed -e "s/SED_PORT_SED/${port}/g" > redis${port}.conf
+	done
+}
+
+stop() {
+	local ports="$*"
+	ports=${ports:=6380 6381 6382}
+	for port in $ports; do
+		if [ $port != 6380 -a $port != 6381 -a $port != 6382 ]; then
+			echo "$PROGNAME: error: only ports 6380, 6381 and 6382 are supported"
+			exit 1
+		fi
+		if alive $port; then
+			echo "Stopping redis-server on port $port"
+			kill $(getpid $port)
+		else
+			echo "Already stopped redis-server on port $port"
+		fi
+	done
 }
 
 case "$1" in
 	'')
 		setup
 		echo "Redis downloaded, built and configured"
+		;;
+	wipe)
+		stop
+		echo "Wiping configuration and persistent state"
+		rm -frv *.aof *.rdb *.conf
 		;;
 	start)
 		setup
@@ -141,20 +162,7 @@ case "$1" in
 	stop)
 		setup
 		shift
-		ports="$*"
-		ports=${ports:=6380 6381 6382}
-		for port in $ports; do
-			if [ $port != 6380 -a $port != 6381 -a $port != 6382 ]; then
-				echo "$PROGNAME: error: only ports 6380, 6381 and 6382 are supported"
-				exit 1
-			fi
-			if alive $port; then
-				echo "Stopping redis-server on port $port"
-				kill $(getpid $port)
-			else
-				echo "Already stopped redis-server on port $port"
-			fi
-		done
+		stop $*
 		;;
 	status)
 		setup
@@ -173,7 +181,7 @@ case "$1" in
 		exit $status
 		;;
 	*)
-		echo 'usage: $PROGNAME [{start|stop|status} [port ...]]' 1>&2
+		echo 'usage: $PROGNAME [{start|stop|status|wipe} [port ...]]' 1>&2
 		echo
 		cat <<EOF
 The script always makes sure that redis has been downloaded, built and
@@ -183,6 +191,9 @@ performed.
 
 If no port numbers are specified for an action, then 6380, 6381 and 6382 are
 assumed. Otherwise the actions are limited to the ports specified.
+
+The wipe action stops all instances and then deletes all configuration and
+persistent state.
 EOF
 		;;
 esac
