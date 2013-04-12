@@ -41,13 +41,19 @@ alive() {
 }
 
 setup() {
-	if [ ! -e "dist/redis-${version}.tar.gz" ]; then
-		mkdir -p dist
-		wget -O "dist/redis-${version}.tar.gz" "http://redis.googlecode.com/files/redis-${version}.tar.gz"
-	fi
+	if [ "${version}" = "unstable" ]; then
+		if [ ! -d "redis-${version}" ]; then
+			git clone git://github.com/antirez/redis "redis-${version}"
+		fi
+	else
+		if [ ! -e "dist/redis-${version}.tar.gz" ]; then
+			mkdir -p dist
+			wget -O "dist/redis-${version}.tar.gz" "http://redis.googlecode.com/files/redis-${version}.tar.gz"
+		fi
 
-	if [ ! -d "redis-${version}" ]; then
-		tar -xzf "dist/redis-${version}.tar.gz"
+		if [ ! -d "redis-${version}" ]; then
+			tar -xzf "dist/redis-${version}.tar.gz"
+		fi
 	fi
 
 	if [ ! -x "redis-${version}/src/redis-server" ]; then

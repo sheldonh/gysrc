@@ -1,6 +1,6 @@
 appendonly*.aof
 dist
 dump*.rdb
-redis-*.*
+redis-*
 redis*.conf
 redis*.pid
