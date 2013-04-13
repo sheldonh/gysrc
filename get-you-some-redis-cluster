@@ -3,11 +3,13 @@
 PROGNAME=$(basename $0)
 
 version=${REDIS_VERSION:=2.6.12}
+cli=redis-${version}/src/redis-cli
+server=redis-${version}/src/redis-server
 
 cd $(dirname $0)
 
 runningpids() {
-	pidof "redis-${version}/src/redis-server" || true
+	pidof "$server" || true
 }
 
 getpid() {
@@ -19,7 +21,7 @@ getpid() {
 
 getrole() {
 	local port=$1
-	role=$("redis-${version}/src/redis-cli" -p $port info  | awk -F: '$1 == "role" {printf "%s", $2}')
+	role=$("$cli" -p $port info  | awk -F: '$1 == "role" {printf "%s", $2}')
 	# Work around carriage return in redis-cli output
 	if echo $role | grep -q master; then
 		echo master
@@ -56,7 +58,7 @@ setup() {
 		fi
 	fi
 
-	if [ ! -x "redis-${version}/src/redis-server" ]; then
+	if [ ! -x "$server" ]; then
 		( cd "redis-${version}" && make )
 	fi
 
@@ -130,6 +132,7 @@ stop() {
 		if alive $port; then
 			echo "Stopping redis-server on port $port"
 			kill $(getpid $port)
+			while alive $port; do sleep 0.1; done
 		else
 			echo "Already stopped redis-server on port $port"
 		fi
@@ -158,7 +161,7 @@ case "$1" in
 			fi
 			if ! alive $port; then
 				echo "Starting redis-server on port $port"
-				"redis-${version}/src/redis-server" redis${port}.conf
+				"$server" redis${port}.conf
 			else
 				echo "Already running redis-server on port $port"
 			fi
